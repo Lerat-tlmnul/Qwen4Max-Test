@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pélican à Vélo — Île Voxel</title>
+<style>
+  :root{
+    --deep:#071c2c;
+    --panel:rgba(7,26,40,.86);
+    --panel-edge:rgba(83,224,235,.28);
+    --teal:#35c4d8;
+    --teal-bright:#5fe8f5;
+    --amber:#ffb347;
+    --coral:#ff5a4e;
+    --sand:#f2dfae;
+    --ink:#eaf6f9;
+    --ink-dim:#9fc3cf;
+    --grass:#63c74d;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--deep)}
+  body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink)}
+  #scene{position:fixed;inset:0;display:block;cursor:grab;touch-action:none}
+  #scene.dragging{cursor:grabbing}
+  #vignette{position:fixed;inset:0;z-index:5;pointer-events:none;
+    background:radial-gradient(120% 100% at 50% 42%,transparent 55%,rgba(4,12,20,.38) 100%)}
+
+  /* ---------- scrollbars maison ---------- */
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:rgba(53,196,216,.08);border-radius:6px}
+  ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--teal),#1a7f96);border-radius:6px;border:2px solid rgba(7,26,40,.9)}
+  ::-webkit-scrollbar-thumb:hover{background:linear-gradient(180deg,var(--amber),#d98324)}
+  *{scrollbar-width:thin;scrollbar-color:#2aa4bb rgba(53,196,216,.08)}
+
+  /* ---------- titre ---------- */
+  #brand{position:fixed;top:18px;left:20px;z-index:10;pointer-events:none;user-select:none}
+  #brand h1{
+    font-family:"Press Start 2P","Courier New",monospace;
+    font-size:clamp(15px,2.4vw,26px);letter-spacing:2px;line-height:1.35;
+    color:var(--sand);
+    text-shadow:3px 3px 0 #b3541e,6px 6px 0 rgba(7,28,44,.55);
+  }
+  #brand h1 span{color:var(--teal-bright);text-shadow:3px 3px 0 #14607a,6px 6px 0 rgba(7,28,44,.55)}
+  #brand p{margin-top:8px;font-size:12px;letter-spacing:3px;text-transform:uppercase;color:var(--ink-dim);
+    text-shadow:1px 1px 0 rgba(7,28,44,.8)}
+  #brand .chip{display:inline-block;margin-top:8px;padding:4px 10px;font-size:11px;font-weight:700;
+    letter-spacing:1px;color:var(--deep);background:linear-gradient(90deg,var(--amber),var(--coral));
+    border-radius:3px;box-shadow:2px 2px 0 rgba(7,28,44,.6)}
+
+  /* ---------- boutons haut-droite ---------- */
+  #topbar{position:fixed;top:18px;right:20px;z-index:12;display:flex;gap:10px}
+  .iconbtn{
+    display:flex;align-items:center;gap:8px;padding:9px 14px;border:1px solid var(--panel-edge);
+    background:var(--panel);backdrop-filter:blur(8px);color:var(--ink);font-size:12px;font-weight:700;
+    letter-spacing:1px;text-transform:uppercase;border-radius:6px;cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,10,20,.4),inset 0 1px 0 rgba(255,255,255,.06);
+    transition:transform .12s,border-color .12s,background .12s;
+  }
+  .iconbtn:hover{transform:translateY(-2px);border-color:var(--teal-bright)}
+  .iconbtn:active{transform:translateY(0)}
+  .iconbtn svg{width:16px;height:16px;fill:currentColor}
+  #soundBtn.on{color:var(--teal-bright)}
+  #soundBtn.off{color:var(--ink-dim)}
+  #soundBtn .wave{transition:opacity .15s}
+  #soundBtn.off .wave{opacity:.15}
+
+  /* ---------- panneau de contrôles ---------- */
+  #panel{
+    position:fixed;top:86px;right:20px;z-index:11;width:288px;
+    max-height:calc(100vh - 170px);overflow-y:auto;overflow-x:hidden;
+    background:var(--panel);backdrop-filter:blur(10px);
+    border:1px solid var(--panel-edge);border-radius:10px;
+    box-shadow:0 10px 34px rgba(0,8,18,.55),inset 0 1px 0 rgba(255,255,255,.05);
+    padding:14px 16px 16px;
+  }
+  #panel h2{
+    font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--teal-bright);
+    margin:14px 0 10px;display:flex;align-items:center;gap:8px;
+  }
+  #panel h2:first-child{margin-top:2px}
+  #panel h2::after{content:"";flex:1;height:2px;background:linear-gradient(90deg,rgba(53,196,216,.5),transparent);border-radius:2px}
+  .ctl{margin-bottom:12px}
+  .ctl label{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--ink);margin-bottom:6px;font-weight:600}
+  .ctl label output{font-family:"Courier New",monospace;font-size:12px;color:var(--amber);font-weight:700}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:22px;background:transparent;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track{
+    height:8px;border-radius:4px;
+    background:linear-gradient(90deg,#123a52,var(--teal) 60%,var(--amber));
+    border:1px solid rgba(95,232,245,.25);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-5px;
+    background:var(--coral);border:2px solid var(--sand);border-radius:3px;
+    box-shadow:2px 2px 0 rgba(7,28,44,.7);transition:transform .1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.15)}
+  input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:linear-gradient(90deg,#123a52,var(--teal) 60%,var(--amber))}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;background:var(--coral);border:2px solid var(--sand);border-radius:3px}
+
+  .switchrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12px;font-weight:600}
+  .switch{position:relative;width:44px;height:22px;flex:none;cursor:pointer}
+  .switch input{opacity:0;width:0;height:0;position:absolute}
+  .switch .track{
+    position:absolute;inset:0;border-radius:4px;background:#123043;border:1px solid rgba(95,232,245,.25);
+    transition:background .15s;
+  }
+  .switch .knob{
+    position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:3px;
+    background:var(--ink-dim);box-shadow:1px 1px 0 rgba(0,0,0,.5);transition:left .15s,background .15s;
+  }
+  .switch input:checked ~ .track{background:linear-gradient(90deg,#1a7f96,var(--teal))}
+  .switch input:checked ~ .knob{left:25px;background:var(--sand)}
+
+  select{
+    width:100%;padding:7px 9px;background:#0d2a3d;color:var(--ink);border:1px solid var(--panel-edge);
+    border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;outline:none;
+  }
+  select:hover{border-color:var(--teal-bright)}
+
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .actions button{
+    padding:9px 6px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
+    border-radius:6px;cursor:pointer;border:1px solid transparent;color:var(--deep);
+    box-shadow:0 3px 0 rgba(0,10,20,.45);transition:transform .1s,filter .1s;
+  }
+  .actions button:hover{filter:brightness(1.12);transform:translateY(-1px)}
+  .actions button:active{transform:translateY(2px);box-shadow:none}
+  #resetBtn{background:linear-gradient(135deg,var(--sand),var(--amber))}
+  #randBtn{background:linear-gradient(135deg,var(--grass),#2e9e4f);color:#04220c}
+  #shotBtn{grid-column:1/-1;background:linear-gradient(135deg,var(--teal-bright),var(--coral));color:#200a08}
+
+  /* ---------- aide bas ---------- */
+  #hint{
+    position:fixed;left:20px;bottom:16px;z-index:10;display:flex;gap:14px;flex-wrap:wrap;
+    padding:9px 14px;background:var(--panel);border:1px solid var(--panel-edge);border-radius:8px;
+    backdrop-filter:blur(8px);font-size:11.5px;color:var(--ink-dim);letter-spacing:.4px;user-select:none;
+  }
+  #hint b{color:var(--teal-bright);font-weight:700}
+  #hint .sep{color:rgba(159,195,207,.35)}
+
+  /* ---------- compteur tour ---------- */
+  #laps{
+    position:fixed;left:20px;bottom:64px;z-index:10;padding:7px 12px;
+    background:var(--panel);border:1px solid var(--panel-edge);border-radius:8px;backdrop-filter:blur(8px);
+    font-family:"Courier New",monospace;font-size:12px;color:var(--sand);letter-spacing:1px;user-select:none;
+  }
+  #laps b{color:var(--coral);font-size:15px}
+
+  /* ---------- chargement ---------- */
+  #loader{
+    position:fixed;inset:0;z-index:50;background:radial-gradient(120% 120% at 50% 20%,#0d3a55 0%,#071c2c 60%,#04101c 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
+    transition:opacity .6s;
+  }
+  #loader.hide{opacity:0;pointer-events:none}
+  #loader .cube{width:46px;height:46px;background:linear-gradient(135deg,var(--teal),var(--amber));
+    border-radius:6px;animation:spin 1.1s cubic-bezier(.6,.1,.3,.9) infinite;box-shadow:0 0 40px rgba(53,196,216,.5)}
+  @keyframes spin{0%{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(.72)}100%{transform:rotate(360deg) scale(1)}}
+  #loader p{font-family:"Courier New",monospace;font-size:13px;letter-spacing:3px;color:var(--teal-bright);text-transform:uppercase}
+
+  #toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:30;
+    padding:10px 18px;background:var(--panel);border:1px solid var(--amber);border-radius:8px;
+    color:var(--sand);font-size:13px;font-weight:600;letter-spacing:.5px;opacity:0;pointer-events:none;
+    transition:opacity .25s,transform .25s;backdrop-filter:blur(8px);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:760px){
+    #brand{top:12px;left:12px}
+    #brand p{display:none}
+    #topbar{top:12px;right:12px}
+    .iconbtn{padding:8px 10px;font-size:0;gap:0}
+    .iconbtn svg{width:18px;height:18px}
+    #panel{
+      top:auto;bottom:0;right:0;left:0;width:100%;max-height:42vh;border-radius:14px 14px 0 0;
+      border-left:none;border-right:none;border-bottom:none;padding:12px 16px 18px;
+    }
+    #hint{display:none}
+    #laps{left:12px;bottom:calc(42vh + 12px)}
+    #toast{bottom:calc(42vh + 16px)}
+  }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="vignette"></div>
+
+<div id="brand">
+  <h1>PÉLICAN <span>À VÉLO</span></h1>
+  <p>Île voxel · océan infini</p>
+  <span class="chip">CLIQUEZ LE PÉLICAN POUR UN COUP DE SONNETTE</span>
+</div>
+
+<div id="topbar">
+  <button id="soundBtn" class="iconbtn on" title="Activer / couper le son">
+    <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path class="wave" d="M14 8.8a4.5 4.5 0 0 1 0 6.4l-1.2-1.2a2.8 2.8 0 0 0 0-4L14 8.8z"/><path class="wave" d="M16.5 6a8 8 0 0 1 0 12l-1.2-1.2a6.3 6.3 0 0 0 0-9.6L16.5 6z"/></svg>
+    <span id="soundLabel">Son activé</span>
+  </button>
+</div>
+
+<div id="panel">
+  <h2>Caméra</h2>
+  <div class="ctl">
+    <label>Zoom <output id="zoomOut">95 m</output></label>
+    <input type="range" id="zoom" min="0" max="100" value="42" step="0.5">
+  </div>
+  <div class="switchrow">Orbite automatique
+    <label class="switch"><input type="checkbox" id="autoOrbit" checked><span class="track"></span><span class="knob"></span></label>
+  </div>
+  <div class="switchrow">Suivre le pélican
+    <label class="switch"><input type="checkbox" id="follow"><span class="track"></span><span class="knob"></span></label>
+  </div>
+
+  <h2>Monde</h2>
+  <div class="ctl">
+    <label>Heure <output id="timeOut">10 h 30</output></label>
+    <input type="range" id="time" min="0" max="24" value="10.5" step="0.1">
+  </div>
+  <div class="ctl">
+    <label>Houle <output id="waveOut">1.0×</output></label>
+    <input type="range" id="wave" min="0" max="2.5" value="1" step="0.05">
+  </div>
+  <div class="ctl">
+    <label>Embruns <output id="sprayOut">260</output></label>
+    <input type="range" id="spray" min="0" max="600" value="260" step="10">
+  </div>
+  <div class="ctl">
+    <label>Qualité</label>
+    <select id="quality">
+      <option value="low">Basse — fluide</option>
+      <option value="med" selected>Moyenne — équilibrée</option>
+      <option value="high">Haute — détails max</option>
+    </select>
+  </div>
+  <div class="switchrow">Mode fil de fer
+    <label class="switch"><input type="checkbox" id="wire"><span class="track"></span><span class="knob"></span></label>
+  </div>
+
+  <h2>Pélican</h2>
+  <div class="ctl">
+    <label>Vitesse de pédalage <output id="speedOut">1.0×</output></label>
+    <input type="range" id="speed" min="0" max="3" value="1" step="0.05">
+  </div>
+
+  <div class="actions">
+    <button id="resetBtn">Réinitialiser</button>
+    <button id="randBtn">Nouvelle île</button>
+    <button id="shotBtn">Exporter la vue (PNG)</button>
+  </div>
+</div>
+
+<div id="laps">TOURS BOUCLÉS : <b id="lapCount">0</b></div>
+
+<div id="hint">
+  <span><b>Glisser</b> orbiter</span><span class="sep">|</span>
+  <span><b>Molette / pincer</b> zoomer</span><span class="sep">|</span>
+  <span><b>Clic pélican</b> sonnette</span><span class="sep">|</span>
+  <span><b>Espace</b> pause</span>
+</div>
+
+<div id="toast"></div>
+
+<div id="loader"><div class="cube"></div><p>Construction de l'île…</p></div>
+
+<noscript><p style="position:fixed;inset:0;display:grid;place-items:center;color:#eaf6f9">Cette scène 3D nécessite JavaScript.</p></noscript>
+
+<script src="vendor/three.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
